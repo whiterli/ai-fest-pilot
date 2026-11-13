@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0a0c0f">
+  <title>Сверка счетов · Северная ягода</title>
+  <script>
+    try {
+      if (localStorage.getItem('pilot-theme') === 'light') {
+        document.documentElement.dataset.theme = 'light';
+        document.querySelector('meta[name="theme-color"]').content = '#f2f5f6';
+      }
+    } catch {
+      // The app can run when the browser blocks storage.
+    }
+  </script>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <dialog id="startup" class="startup" aria-label="Заставка Navicon">
+    <div class="startup-content">
+      <img class="startup-logo startup-logo-dark" src="./assets/navicon-dark.png" alt="Navicon" width="2000" height="737">
+      <img class="startup-logo startup-logo-light" src="./assets/navicon-light.png" alt="Navicon" width="2000" height="737">
+      <h2 class="startup-slogan" tabindex="-1" autofocus>
+        <span id="startup-slogan">Технологии, которые вдохновляют ваш бизнес</span>
+        <span class="startup-line" aria-hidden="true"><span id="startup-typed"></span></span>
+      </h2>
+    </div>
+    <button id="startup-skip" class="startup-skip button secondary" type="button">Пропустить</button>
+  </dialog>
+  <header class="top">
+    <div class="top-inner">
+      <div class="brand"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>Северная ягода</div>
+      <span class="top-divider"></span>
+      <span class="top-context">Бухгалтерия</span>
+      <span class="top-case">Navicon AI Fest · Кейс 04</span>
+      <button class="theme-toggle" id="theme-toggle" type="button" role="switch" aria-label="Светлая тема" aria-checked="false" title="Переключить тему">
+        <span class="theme-icon theme-moon" aria-hidden="true">☾</span>
+        <span class="theme-icon theme-sun" aria-hidden="true">☀︎</span>
+      </button>
+    </div>
+  </header>
+  <main class="shell">
+    <input type="file" id="upload" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
+    <p class="error-banner" id="error" role="alert" hidden></p>
+    <p class="file-status" id="file-status" role="status"></p>
+    <section class="import-card" id="import-start" aria-labelledby="import-heading">
+      <div class="import-icon" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+      <h1 id="import-heading">Загрузите Excel для сверки</h1>
+      <p>Выберите книгу данных кейса №04. Приложение сопоставит счета с заказами, приёмкой и согласованиями и покажет, какие письма требуют внимания.</p>
+      <button class="button primary" id="choose-file" type="button"><span aria-hidden="true">↑</span> Выбрать файл XLSX</button>
+      <p class="import-format">Листы книги: «Счета и письма», «Заказы и приёмка», «Согласования» и «Правила».</p>
+    </section>
+    <section id="analysis" aria-labelledby="analysis-heading" hidden>
+      <div class="hero">
+        <div>
+          <div class="crumb">Закупки <span aria-hidden="true">/</span> Сверка</div>
+          <h1 id="analysis-heading" tabindex="-1">Очередь счетов</h1>
+          <p>Сверка счетов за упаковку с заказами, приёмкой и согласованиями.</p>
+        </div>
+        <div class="hero-actions">
+          <button type="button" class="button secondary" id="open-letter"><span aria-hidden="true">＋</span> Вставить письмо</button>
+          <button class="button primary" id="replace-file" type="button"><span aria-hidden="true">↑</span> Заменить XLSX</button>
+        </div>
+      </div>
+      <div class="source-bar">
+        <div><span class="source-dot"></span><span id="source"></span></div>
+        <button class="button secondary" id="download-results" type="button"><span aria-hidden="true">↓</span> Скачать результаты в Excel</button>
+      </div>
+      <div class="kpis" id="kpis" aria-label="Сводка очереди"></div>
+      <div class="work">
+        <section class="panel queue" aria-labelledby="queue-title">
+          <div class="panel-head">
+            <div><h2 id="queue-title">Входящие</h2><p id="queue-count"></p></div>
+            <label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Счёт, заказ, поставщик" aria-label="Поиск по очереди"></label>
+          </div>
+          <div class="filters" id="filters" aria-label="Фильтр по статусу"></div>
+          <div class="queue-scroll">
+            <table>
+              <thead><tr><th>Письмо / поставщик</th><th>Статус</th><th class="amount">Сумма</th></tr></thead>
+              <tbody id="rows"></tbody>
+            </table>
+            <p class="empty" id="no-results" hidden>По этому запросу ничего не найдено.</p>
+          </div>
+        </section>
+        <section class="panel detail" id="detail" aria-label="Карточка сверки"></section>
+      </div>
+    </section>
+    <footer><span>Пилот сверки счетов поставщиков</span><a href="https://navicons.com/careers/ai-fest-2026/cases/#case-04">Условия кейса ↗</a></footer>
+  </main>
+  <dialog id="letter-dialog" aria-labelledby="letter-title">
+    <form id="letter-form">
+      <div class="dialog-head"><h2 id="letter-title">Проверить новое письмо</h2><button class="close" id="close-letter" type="button" aria-label="Закрыть">×</button></div>
+      <label>Поставщик <input id="letter-sender" required maxlength="160" placeholder="Например, Пакетная линия"></label>
+      <label>Текст письма <textarea id="letter-body" required maxlength="12000" rows="6" placeholder="Счёт 203 по ЗП-06: пакет для ягод 300 г, 500 шт. по 3 руб. Итого 1 500 руб."></textarea></label>
+      <div class="dialog-actions"><button type="submit" class="button primary">Проверить</button></div>
+    </form>
+  </dialog>
+  <noscript>Для работы пилота включите JavaScript.</noscript>
+  <script type="module" src="./app.mjs"></script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+pilot.html
+*.xlsx
+*.xlsm
+*.log
+node_modules/
+core/target/
+.env
+.env.*
