@@ -4,11 +4,18 @@ const read = name => readFile(new URL(name, import.meta.url), 'utf8');
 const [html, css, reconcile, xlsx, exporter, app] = await Promise.all(
   ['index.html', 'style.css', 'reconcile.mjs', 'xlsx.mjs', 'export.mjs', 'app.mjs'].map(read),
 );
-const logoPaths = ['./assets/navicon-dark.png', './assets/navicon-light.png'];
-const logos = await Promise.all(logoPaths.map(path => readFile(new URL(path, import.meta.url))));
+const assets = [
+  ['./assets/potok.svg', 'image/svg+xml'],
+  ['./assets/navicon-dark.png', 'image/png'],
+  ['./assets/navicon-light.png', 'image/png'],
+];
+const embeddedAssets = await Promise.all(assets.map(async ([path, type]) => {
+  const contents = await readFile(new URL(path, import.meta.url));
+  return [path, `data:${type};base64,${contents.toString('base64')}`];
+}));
 const script = [reconcile, xlsx, exporter, app].join('\n').replace(/^export /gm, '').replace(/^import .*?;\r?\n/gm, '');
-const embedded = logoPaths.reduce((page, path, index) =>
-  page.replace(`src="${path}"`, `src="data:image/png;base64,${logos[index].toString('base64')}"`), html);
+const embedded = embeddedAssets.reduce((page, [path, url]) =>
+  page.replaceAll(`"${path}"`, `"${url}"`), html);
 const result = embedded
   .replace('<link rel="stylesheet" href="./style.css">', () => `<style>\n${css}</style>`)
   .replace('<script type="module" src="./app.mjs"></script>', () =>

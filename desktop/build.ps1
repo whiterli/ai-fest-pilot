@@ -1,13 +1,35 @@
 param(
     [string]$OutputPath,
     [string]$SdkPackage,
-    [string]$CoreExecutable
+    [string]$CoreExecutable,
+    [ValidatePattern('^[0-9A-Fa-f]{40}$')]
+    [string]$SigningCertificateThumbprint,
+    [uri]$TimestampUrl,
+    [string]$SignToolPath = 'signtool.exe'
 )
 
 $ErrorActionPreference = 'Stop'
 $project = Split-Path -Parent $PSScriptRoot
-if (-not $OutputPath) { $OutputPath = Join-Path $project 'SevernayaYagoda.exe' }
+if (-not $OutputPath) { $OutputPath = Join-Path $project 'Potok.exe' }
 $OutputPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutputPath)
+
+if ($SigningCertificateThumbprint) {
+    if (-not $TimestampUrl -or -not $TimestampUrl.IsAbsoluteUri -or $TimestampUrl.Scheme -ne 'https') {
+        throw 'Для подписи укажите HTTPS-адрес сервера меток времени в параметре TimestampUrl.'
+    }
+    $certificate = Get-Item -LiteralPath "Cert:/CurrentUser/My/$SigningCertificateThumbprint" -ErrorAction SilentlyContinue
+    if (-not $certificate -or -not $certificate.HasPrivateKey) {
+        throw 'Сертификат подписи кода с закрытым ключом не найден в хранилище текущего пользователя.'
+    }
+    $signTool = (Get-Command $SignToolPath -CommandType Application).Source
+}
+
+function Protect-Executable([string]$Path) {
+    & $signTool sign /sha1 $SigningCertificateThumbprint /fd SHA256 /tr $TimestampUrl.AbsoluteUri /td SHA256 $Path
+    if ($LASTEXITCODE -ne 0) { throw "Не удалось подписать файл: $Path" }
+    & $signTool verify /pa /tw $Path
+    if ($LASTEXITCODE -ne 0) { throw "Проверка подписи завершилась с ошибкой: $Path" }
+}
 
 $compiler = Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
 if (-not (Test-Path -LiteralPath $compiler)) {
@@ -42,6 +64,12 @@ try {
         $CoreExecutable = Join-Path $rustTarget 'x86_64-pc-windows-msvc/release/severnaya-yagoda-core.exe'
     }
     $CoreExecutable = (Resolve-Path -LiteralPath $CoreExecutable).Path
+    if ($SigningCertificateThumbprint) {
+        $signedCore = Join-Path $scratch 'PilotCore.exe'
+        Copy-Item -LiteralPath $CoreExecutable -Destination $signedCore
+        Protect-Executable $signedCore
+        $CoreExecutable = $signedCore
+    }
     & node (Join-Path $project 'build.mjs')
     if ($LASTEXITCODE -ne 0) { throw 'Сборка интерфейса завершилась с ошибкой.' }
 
@@ -76,7 +104,7 @@ try {
     $manifest = Join-Path $PSScriptRoot 'Pilot.manifest'
     $code = Join-Path $PSScriptRoot 'Pilot.cs'
     $rustSession = Join-Path $PSScriptRoot 'RustSession.cs'
-    $compiled = Join-Path $scratch 'SevernayaYagoda.exe'
+    $compiled = Join-Path $scratch 'Potok.exe'
     $arguments = @(
         '/nologo', '/target:winexe', '/platform:x64', '/optimize+',
         '/reference:System.Windows.Forms.dll', '/reference:System.Drawing.dll',
@@ -89,6 +117,7 @@ try {
     & $compiler @arguments
     if ($LASTEXITCODE -ne 0) { throw 'Сборка Windows-приложения завершилась с ошибкой.' }
 
+    if ($SigningCertificateThumbprint) { Protect-Executable $compiled }
     Copy-Item -LiteralPath $compiled -Destination $OutputPath
     Get-Item -LiteralPath $OutputPath
 } finally {

@@ -10,10 +10,10 @@ using System.Windows.Forms;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 
-[assembly: AssemblyTitle("Северная ягода — сверка счетов")]
-[assembly: AssemblyProduct("Северная ягода")]
-[assembly: AssemblyVersion("1.5.0.0")]
-[assembly: AssemblyFileVersion("1.5.0.0")]
+[assembly: AssemblyTitle("Поток — сверка счетов")]
+[assembly: AssemblyProduct("Поток")]
+[assembly: AssemblyVersion("1.5.2.0")]
+[assembly: AssemblyFileVersion("1.5.2.0")]
 
 static class Program
 {
@@ -55,7 +55,7 @@ static class Program
 #if VERIFY
             if (args.Length == 2) { File.WriteAllText(args[1], problem.ToString()); return; }
 #endif
-            MessageBox.Show(problem.Message, "Северная ягода", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show(problem.Message, "Поток", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
         finally
         {
@@ -181,7 +181,7 @@ sealed class PilotWindow : Form
         ShowInTaskbar = false;
         Opacity = 0.01;
 #endif
-        Text = "Северная ягода — сверка счетов";
+        Text = "Поток — сверка счетов";
         Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
         StartPosition = FormStartPosition.CenterScreen;
         var work = Screen.PrimaryScreen.WorkingArea;
@@ -248,7 +248,7 @@ sealed class PilotWindow : Form
             browser.Navigate(HomePage);
 #if VERIFY
             await Verify(browser);
-            File.WriteAllText(verification[1], "PASS: per-monitor DPI " + GetDpiForWindow(Handle) + ", startup, animated themes, XLSX analysis, new letter, full Excel download");
+            File.WriteAllText(verification[1], "PASS: per-monitor DPI " + GetDpiForWindow(Handle) + ", startup and skip, reduced motion, animated themes, XLSX analysis, stable row selection, new letter, full Excel download");
             Close();
 #endif
         }
@@ -259,7 +259,7 @@ sealed class PilotWindow : Form
             File.WriteAllText(verification[1], problem.ToString());
 #else
             MessageBox.Show(this, "Не удалось запустить приложение. " + problem.Message,
-                "Северная ягода", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                "Поток", MessageBoxButtons.OK, MessageBoxIcon.Error);
 #endif
             Close();
         }
@@ -319,10 +319,25 @@ sealed class PilotWindow : Form
         if (!reloaded.Task.IsCompleted || !reloaded.Task.Result) throw new InvalidOperationException("Reload failed");
         await Expect(browser, "document.getElementById('analysis').hidden && document.documentElement.dataset.theme === 'light'");
         await Expect(browser, "document.getElementById('startup').open && document.querySelector('.startup-logo-light').naturalWidth > 0");
+        using (var shot = File.Create(Path.ChangeExtension(verification[1], ".startup-light.png")))
+        {
+            await Expect(browser, "!document.querySelector('#startup-typed > span:not(.printed)')");
+            await browser.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png, shot);
+        }
+        browser.Reload();
+        await Expect(browser, "document.getElementById('startup').open && document.querySelector('#startup-typed > span:not(.printed)')");
         await browser.ExecuteScriptAsync("document.getElementById('startup-skip').click()");
+        await Expect(browser, "document.getElementById('startup').matches('[open].closing')");
         await Expect(browser, "!document.getElementById('startup').open");
         await browser.ExecuteScriptAsync("document.getElementById('theme-toggle').click()");
         await Expect(browser, "document.getElementById('theme-toggle').getAttribute('aria-checked') === 'false' && getComputedStyle(document.documentElement).backgroundColor === 'rgb(10, 12, 15)'");
+
+        await browser.CallDevToolsProtocolMethodAsync("Emulation.setEmulatedMedia",
+            "{\"features\":[{\"name\":\"prefers-reduced-motion\",\"value\":\"reduce\"}]}");
+        browser.Reload();
+        await Expect(browser, "matchMedia('(prefers-reduced-motion: reduce)').matches &&" +
+            " !document.getElementById('startup').open && !document.getElementById('startup-typed').children.length &&" +
+            " !document.getElementById('import-start').hidden && document.getElementById('analysis').hidden");
 
         await browser.ExecuteScriptAsync("(function(){const transfer=new DataTransfer();" +
             "transfer.items.add(new File(['not a workbook'],'invalid.xlsx'));const input=document.getElementById('upload');" +
@@ -344,13 +359,24 @@ sealed class PilotWindow : Form
         using (var shot = File.Create(Path.ChangeExtension(verification[1], ".analysis.png")))
             await browser.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png, shot);
 
+        await Expect(browser, "(() => {" +
+            "const rows=document.getElementById('rows'), first=rows.firstElementChild, row=rows.children[10];" +
+            "const button=row.querySelector('button'), scroller=rows.closest('.queue-scroll');" +
+            "scroller.scrollTop=150; const scroll=scroller.scrollTop;" +
+            "button.focus({preventScroll:true}); button.click();" +
+            "return first===rows.firstElementChild && !first.classList.contains('selected') && row.classList.contains('selected') &&" +
+            " document.activeElement===button && button.getAttribute('aria-current')==='true' &&" +
+            " scroller.scrollTop===scroll && document.querySelector('#detail .eyebrow').textContent.startsWith(row.dataset.id);" +
+            "})()");
+
         await browser.ExecuteScriptAsync("document.getElementById('open-letter').click();" +
             "document.getElementById('letter-sender').value='Картон-Сервис';" +
             "document.getElementById('letter-body').value='Счёт 98 по ЗП-14: прокладка 1200×800, 500 шт. по 12 руб. Итого 6 000 руб.';" +
             "document.getElementById('letter-form').requestSubmit()");
         await Expect(browser, "document.querySelectorAll('#rows tr').length === 26 && document.querySelector('#detail .badge').textContent === 'Сверен'");
 
-        var downloaded = new TaskCompletionSource<bool>();
+        await Expect(browser, "!document.getElementById('download-results').disabled");
+        var downloaded = new TaskCompletionSource<string>();
         string exportPath = Path.ChangeExtension(verification[1], ".results.xlsx");
         EventHandler<CoreWebView2DownloadStartingEventArgs> save = (sender, args) =>
         {
@@ -360,15 +386,18 @@ sealed class PilotWindow : Form
             operation.StateChanged += (source, evt) =>
             {
                 if (operation.State != CoreWebView2DownloadState.InProgress)
-                    downloaded.TrySetResult(operation.State == CoreWebView2DownloadState.Completed);
+                    downloaded.TrySetResult(operation.State == CoreWebView2DownloadState.Completed
+                        ? "Completed" : operation.InterruptReason.ToString());
             };
         };
         browser.DownloadStarting += save;
         await browser.ExecuteScriptAsync("document.querySelector('#filters [data-filter=ready]').click(); document.getElementById('download-results').click()");
-        await Task.WhenAny(downloaded.Task, Task.Delay(6000));
+        await Task.WhenAny(downloaded.Task, Task.Delay(10000));
         browser.DownloadStarting -= save;
-        if (!downloaded.Task.IsCompleted || !downloaded.Task.Result || !File.Exists(exportPath))
-            throw new InvalidOperationException("Excel export did not finish.");
+        if (!downloaded.Task.IsCompleted || downloaded.Task.Result != "Completed" || !File.Exists(exportPath))
+            throw new InvalidOperationException("Excel export did not finish: " +
+                (downloaded.Task.IsCompleted ? downloaded.Task.Result : "timed out") + " | " +
+                await browser.ExecuteScriptAsync("document.getElementById('error').textContent"));
     }
 
     private static async Task Expect(CoreWebView2 browser, string expression)

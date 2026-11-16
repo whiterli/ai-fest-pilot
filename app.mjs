@@ -85,6 +85,8 @@ themeToggle.addEventListener('click', () => {
 function showStartup() {
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const dialog = $('startup');
+  if (!dialog.showModal) return;
+  const skip = $('startup-skip');
   const typed = $('startup-typed');
   const slogan = $('startup-slogan').textContent;
   const characters = Array.from(slogan, character => {
@@ -93,39 +95,59 @@ function showStartup() {
     return span;
   });
   typed.replaceChildren(...characters);
-  let timer;
+  let frame;
+  let finishTimer;
   let index = 0;
+  let nextLetter = 540;
 
-  function finishOnAnimation(event) {
-    if (event.animationName === 'startup-backdrop-out') dialog.close();
+  function reveal() {
+    if (!dialog.open || dialog.classList.contains('closing')) return;
+    cancelAnimationFrame(frame);
+    characters[index - 1]?.classList.remove('caret');
+    dialog.classList.add('closing');
+    finishTimer = setTimeout(() => dialog.close(), 800);
   }
 
-  function typeNext() {
-    const previous = characters[index - 1];
-    const current = characters[index];
-    previous?.classList.remove('caret');
-    current.classList.add('printed', 'caret');
-    index++;
-    if (index < characters.length) {
-      const delay = current.textContent === ',' ? 110 : current.textContent === ' ' ? 18 : 32;
-      timer = setTimeout(typeNext, delay);
-      return;
+  let started;
+  function type(now) {
+    started ??= now;
+    const elapsed = now - started;
+    if (elapsed >= nextLetter) {
+      characters[index - 1]?.classList.remove('caret');
+      while (index < characters.length && elapsed >= nextLetter) {
+        const letter = characters[index++];
+        letter.classList.add('printed');
+        nextLetter += index === characters.length ? 390
+          : letter.textContent === ',' ? 105 : letter.textContent === ' ' ? 20 : 31;
+      }
+      if (index === characters.length && elapsed >= nextLetter) {
+        reveal();
+        return;
+      }
+      characters[index - 1]?.classList.add('caret');
     }
-    timer = setTimeout(() => {
-      current.classList.remove('caret');
-      dialog.classList.add('closing');
-      timer = setTimeout(() => dialog.close(), 900);
-    }, 580);
+    frame = requestAnimationFrame(type);
   }
 
-  $('startup-skip').addEventListener('click', () => dialog.close(), {once: true});
+  const finishOnAnimation = event => {
+    if (event.animationName === 'startup-backdrop-out') dialog.close();
+  };
+  const cancel = event => {
+    event.preventDefault();
+    reveal();
+  };
+  skip.addEventListener('click', reveal);
+  dialog.addEventListener('cancel', cancel);
   dialog.addEventListener('animationend', finishOnAnimation);
   dialog.addEventListener('close', () => {
-    clearTimeout(timer);
+    cancelAnimationFrame(frame);
+    clearTimeout(finishTimer);
+    skip.removeEventListener('click', reveal);
+    dialog.removeEventListener('cancel', cancel);
     dialog.removeEventListener('animationend', finishOnAnimation);
   }, {once: true});
   dialog.showModal();
-  timer = setTimeout(typeNext, 790);
+  frame = requestAnimationFrame(type);
 }
 
 showStartup();
@@ -157,6 +179,8 @@ let dataset = {entries: [], rules: {}};
 let added = [];
 let filter = 'all';
 let selected = '';
+let visibleById = new Map();
+let selectedRow;
 
 function setBusy(value) {
   busy = value;
@@ -216,7 +240,7 @@ function draft(entry) {
   </div></details>`;
 }
 
-function renderDetail(entry) {
+function renderDetail(entry, animate = false) {
   if (!entry) {
     $('detail').innerHTML = '<p class="empty">Выберите письмо из входящих, чтобы увидеть результат сверки.</p>';
     return;
@@ -227,7 +251,7 @@ function renderDetail(entry) {
       <div class="detail-top"><span class="eyebrow">${escape(entry.id)}${entry.received ? ` · ${escape(entry.received)}` : ''}</span>${badge(entry)}</div>
       <h2>${escape(heading(entry))}</h2><p>${escape(supplier(entry))}</p>
     </div>
-    <div class="detail-body">
+    <div class="detail-body${animate ? ' detail-enter' : ''}">
       <div class="finding ${tone}"><h3>${escape(entry.title)}</h3><p>${escape(entry.explanation)}</p></div>
       <div class="next"><span class="arrow" aria-hidden="true">→</span><div><h3>Следующий шаг</h3><p>${escape(entry.action)}</p></div></div>
       ${facts(entry)}
@@ -244,7 +268,8 @@ function countResults() {
 
 function render({preserveFocus = false} = {}) {
   const rows = visibleEntries();
-  if (!rows.some(entry => entry.id === selected)) selected = rows[0]?.id ?? '';
+  visibleById = new Map(rows.map(entry => [entry.id, entry]));
+  if (!visibleById.has(selected)) selected = rows[0]?.id ?? '';
   const counts = countResults();
   $('queue-count').textContent = `${rows.length} из ${counts.all} писем`;
   $('kpis').innerHTML = Object.entries(filters).map(([key, [, label, tone]]) =>
@@ -258,8 +283,9 @@ function render({preserveFocus = false} = {}) {
       <td>${badge(entry)}</td><td class="amount">${amount(entry.amount)}</td>
     </tr>`).join('');
   $('no-results').hidden = rows.length > 0;
-  renderDetail(rows.find(entry => entry.id === selected));
-  if (preserveFocus) document.querySelector('.selected button')?.focus({preventScroll: true});
+  selectedRow = $('rows').querySelector('.selected');
+  renderDetail(visibleById.get(selected));
+  if (preserveFocus) selectedRow?.querySelector('.row-open').focus({preventScroll: true});
 }
 
 function setAnalysis(result, label, data) {
@@ -292,11 +318,22 @@ for (const id of ['kpis', 'filters']) {
 }
 $('search').addEventListener('input', () => render());
 $('rows').addEventListener('click', event => {
-  const id = event.target.closest('tr')?.dataset.id;
-  if (!id) return;
-  selected = id;
-  render({preserveFocus: event.detail === 0});
-  if (matchMedia('(max-width: 730px)').matches) $('detail').scrollIntoView({block: 'start'});
+  const row = event.target.closest('tr[data-id]');
+  const entry = visibleById.get(row?.dataset.id);
+  if (!entry) return;
+  if (row !== selectedRow) {
+    selectedRow?.classList.remove('selected');
+    selectedRow?.querySelector('.row-open').setAttribute('aria-current', 'false');
+    row.classList.add('selected');
+    row.querySelector('.row-open').setAttribute('aria-current', 'true');
+    selected = entry.id;
+    selectedRow = row;
+    renderDetail(entry, true);
+  }
+  if (matchMedia('(max-width: 730px)').matches) {
+    const behavior = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth';
+    $('detail').scrollIntoView({block: 'start', behavior});
+  }
 });
 $('detail').addEventListener('click', async event => {
   const related = event.target.closest('[data-related]')?.dataset.related;

@@ -10,14 +10,14 @@
 </p>
 
 <p align="center">
-  <a href="./SevernayaYagoda-1.5.exe?raw=true">Скачать для Windows x64</a> &nbsp;·&nbsp;
+  <a href="./Potok-1.5.2.exe?raw=true">Скачать «Поток» 1.5.2 для Windows x64</a> &nbsp;·&nbsp;
   <a href="./Potok-Navicon-AI-Fest.pptx">Презентация для защиты</a> &nbsp;·&nbsp;
   <a href="https://navicons.com/careers/ai-fest-2026/cases/#case-04">Условия и данные кейса</a>
 </p>
 
 ![Очередь счетов в «Потоке» и карточка счёта №52 с расхождением в 1 000 ₽](./assets/potok-demo.png)
 
-*На скриншоте — интерфейс «Потока» 1.5.2. По ссылке выше доступна сборка 1.5 с прежним названием «Северная ягода».*
+*Интерфейс «Потока» 1.5.2 на учебных данных кейса №04.*
 
 ## Что делает «Поток»
 
@@ -39,7 +39,7 @@
 
 ## Быстрый старт
 
-1. Скачайте [сборку для Windows x64](./SevernayaYagoda-1.5.exe?raw=true) и запустите её. Для работы нужен **Microsoft Edge WebView2 Runtime**.
+1. Скачайте [сборку для Windows x64](./Potok-1.5.2.exe?raw=true) и запустите её. Для работы нужен **Microsoft Edge WebView2 Runtime**.
 2. Нажмите **«Выбрать файл XLSX»** и откройте книгу из [условий кейса](https://navicons.com/careers/ai-fest-2026/cases/#case-04). В ней четыре листа — «Счета и письма», «Заказы и приёмка», «Согласования» и «Правила».
 3. Откройте письмо, чтобы увидеть результат сверки. Новое письмо можно добавить вручную через **«Вставить письмо»**.
 4. Нажмите **«Скачать результаты в Excel»**, чтобы сохранить отчёт.
@@ -81,6 +81,15 @@ node test.mjs
 ```powershell
 .\desktop\build.ps1 -OutputPath .\Potok.exe
 ```
+
+Для подписанной сборки нужен сертификат подписи кода от доверенного центра сертификации в хранилище `Cert:\CurrentUser\My` и SignTool из Windows SDK. Передайте отпечаток сертификата и HTTPS-адрес сервера меток времени, указанный поставщиком сертификата.
+
+```powershell
+.\desktop\build.ps1 -OutputPath .\Potok-1.5.2-signed.exe `
+    -SigningCertificateThumbprint $certificateThumbprint -TimestampUrl $timestampUrl
+```
+
+Если SignTool отсутствует в PATH, укажите его полный путь параметром `-SignToolPath`. Скрипт подписывает ядро Rust перед упаковкой, затем подписывает и проверяет итоговый EXE. [SmartScreen может предупредить и о новой подписанной сборке, пока у неё нет репутации.](https://learn.microsoft.com/windows/apps/package-and-deploy/smartscreen-reputation)
 
 ## Границы пилота
 
