@@ -1,8 +1,17 @@
-pilot.html
+# Сгенерированные файлы и локальные сборки
+/pilot.html
+/core/target/
+node_modules/
+*.exe
+!/Potok-1.5.2.exe
+
+# Рабочие документы, логи и настройки
 *.xlsx
 *.xlsm
 *.log
-node_modules/
-core/target/
 .env
 .env.*
+~$*
+Thumbs.db
+Desktop.ini
+.DS_Store

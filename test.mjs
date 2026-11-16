@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {reconcile} from './reconcile.mjs';
 
-const data = JSON.parse(await readFile(new URL('demo.json', import.meta.url), 'utf8'));
+const data = JSON.parse(await readFile(new URL('./tests/fixtures/case-04.json', import.meta.url), 'utf8'));
 const {entries} = reconcile(data);
 // Hand-checked against the order, warehouse and approval rows in the case workbook.
 const expected = [
