@@ -3,7 +3,7 @@
 /core/target/
 node_modules/
 *.exe
-!/Potok-1.5.2.exe
+!/Potok-1.6.0.exe
 
 # Рабочие документы, логи и настройки
 *.xlsx

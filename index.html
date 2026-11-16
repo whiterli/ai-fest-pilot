@@ -53,39 +53,66 @@
       <button class="button primary" id="choose-file" type="button"><span aria-hidden="true">↑</span> Выбрать файл XLSX</button>
       <p class="import-format">Листы книги: «Счета и письма», «Заказы и приёмка», «Согласования» и «Правила».</p>
     </section>
-    <section id="analysis" aria-labelledby="analysis-heading" hidden>
-      <div class="hero">
-        <div>
-          <div class="crumb">Закупки <span aria-hidden="true">/</span> Сверка</div>
-          <h1 id="analysis-heading" tabindex="-1">Очередь счетов</h1>
-          <p>Сверка счетов за упаковку с заказами, приёмкой и согласованиями.</p>
-        </div>
-        <div class="hero-actions">
-          <button type="button" class="button secondary" id="open-letter"><span aria-hidden="true">＋</span> Вставить письмо</button>
-          <button class="button primary" id="replace-file" type="button"><span aria-hidden="true">↑</span> Заменить XLSX</button>
-        </div>
-      </div>
-      <div class="source-bar">
-        <div><span class="source-dot"></span><span id="source"></span></div>
-        <button class="button secondary" id="download-results" type="button"><span aria-hidden="true">↓</span> Скачать результаты в Excel</button>
-      </div>
-      <div class="kpis" id="kpis" aria-label="Сводка очереди"></div>
-      <div class="work">
-        <section class="panel queue" aria-labelledby="queue-title">
-          <div class="panel-head">
-            <div><h2 id="queue-title">Входящие</h2><p id="queue-count"></p></div>
-            <label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Счёт, заказ, поставщик" aria-label="Поиск по очереди"></label>
+    <section class="workspace" id="analysis" aria-labelledby="analysis-heading" hidden>
+      <aside class="workspace-sidebar">
+        <span class="workspace-label">Сверка счетов</span>
+        <nav id="workspace-nav" aria-label="Разделы Потока">
+          <button class="workspace-tab" type="button" data-view="overview" aria-controls="view-overview" aria-current="page">Обзор</button>
+          <button class="workspace-tab" type="button" data-view="queue" aria-controls="view-queue">Очередь счетов</button>
+          <button class="workspace-tab" type="button" data-view="rules" aria-controls="view-rules">Правила сверки</button>
+        </nav>
+        <div class="workspace-source"><span class="source-dot" aria-hidden="true"></span><div><span>Загруженный файл</span><strong id="source"></strong></div></div>
+      </aside>
+      <div class="workspace-main">
+        <div class="hero">
+          <div>
+            <h1 id="analysis-heading" tabindex="-1">Обзор сверки</h1>
+            <p id="view-description">По каким письмам нужно принять решение.</p>
           </div>
-          <div class="filters" id="filters" aria-label="Фильтр по статусу"></div>
-          <div class="queue-scroll">
-            <table>
-              <thead><tr><th>Письмо / поставщик</th><th>Статус</th><th class="amount">Сумма</th></tr></thead>
-              <tbody id="rows"></tbody>
-            </table>
-            <p class="empty" id="no-results" hidden>По этому запросу ничего не найдено.</p>
+          <div class="hero-actions">
+            <button class="button secondary" id="open-letter" type="button"><span aria-hidden="true">＋</span> Вставить письмо</button>
+            <button class="button secondary" id="replace-file" type="button"><span aria-hidden="true">↑</span> Заменить XLSX</button>
+            <button class="button primary" id="download-results" type="button"><span aria-hidden="true">↓</span> Скачать результаты в Excel</button>
           </div>
+        </div>
+        <section id="view-overview" aria-labelledby="overview-title">
+          <div class="overview-feature">
+            <div>
+              <h2 id="overview-title">Результат сверки</h2>
+              <p id="overview-message"></p>
+              <button type="button" class="button primary" id="open-priority">Открыть очередь</button>
+            </div>
+            <div class="overview-count"><strong id="overview-number"></strong><span id="overview-total"></span></div>
+            <div class="overview-track" id="overview-track" aria-hidden="true"></div>
+          </div>
+          <div class="kpis" id="kpis" aria-label="Сводка очереди"></div>
+          <section class="panel priority" id="priority-list" aria-labelledby="priority-title">
+            <div class="panel-head"><div><h2 id="priority-title">С чего начать</h2><p>Реквизиты, явные ошибки и счета, которые нужно уточнить.</p></div></div>
+            <div id="priority-entries"></div>
+          </section>
         </section>
-        <section class="panel detail" id="detail" aria-label="Карточка сверки"></section>
+        <section class="work" id="view-queue" aria-label="Очередь и карточка счёта" hidden>
+          <section class="panel queue" aria-labelledby="queue-title">
+            <div class="panel-head">
+              <div><h2 id="queue-title">Входящие</h2><p id="queue-count"></p></div>
+              <label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Счёт, заказ, поставщик" aria-label="Поиск по очереди"></label>
+            </div>
+            <div class="filters" id="filters" aria-label="Фильтр по статусу"></div>
+            <div class="queue-scroll">
+              <table>
+                <thead><tr><th>Письмо / поставщик</th><th>Статус</th><th class="amount">Сумма</th></tr></thead>
+                <tbody id="rows"></tbody>
+              </table>
+              <p class="empty" id="no-results" hidden>По этому запросу ничего не найдено.</p>
+            </div>
+          </section>
+          <section class="panel detail" id="detail" aria-label="Карточка сверки"></section>
+        </section>
+        <section class="panel rule-panel" id="view-rules" aria-labelledby="rule-title" hidden>
+          <div class="panel-head"><h2 id="rule-title">Что проверяет «Поток»</h2></div>
+          <div id="rule-list"></div>
+          <p class="rule-note">Получателя платежа и решение об оплате подтверждает бухгалтер.</p>
+        </section>
       </div>
     </section>
     <footer><span>Пилот сверки счетов поставщиков</span><a href="https://navicons.com/careers/ai-fest-2026/cases/#case-04">Условия кейса ↗</a></footer>

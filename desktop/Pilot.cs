@@ -12,8 +12,8 @@ using Microsoft.Web.WebView2.WinForms;
 
 [assembly: AssemblyTitle("Поток — сверка счетов")]
 [assembly: AssemblyProduct("Поток")]
-[assembly: AssemblyVersion("1.5.2.0")]
-[assembly: AssemblyFileVersion("1.5.2.0")]
+[assembly: AssemblyVersion("1.6.0.0")]
+[assembly: AssemblyFileVersion("1.6.0.0")]
 
 static class Program
 {
@@ -356,6 +356,10 @@ sealed class PilotWindow : Form
             "transfer.items.add(new File([bytes],'case.xlsx'));const input=document.getElementById('upload');" +
             "input.files=transfer.files;input.dispatchEvent(new Event('change'));})()");
         await Expect(browser, "!document.getElementById('analysis').hidden && document.getElementById('import-start').hidden && document.getElementById('error').hidden && document.getElementById('source').textContent === 'case.xlsx' && document.querySelectorAll('#rows tr').length === 25");
+        await Expect(browser, "!document.getElementById('view-overview').hidden && document.getElementById('overview-number').textContent === '11' && document.querySelectorAll('#priority-entries button').length === 3");
+        await browser.ExecuteScriptAsync("document.querySelector('#workspace-nav [data-view=rules]').click()");
+        await Expect(browser, "!document.getElementById('view-rules').hidden && document.querySelector('#rule-list details')");
+        await browser.ExecuteScriptAsync("document.querySelector('#workspace-nav [data-view=queue]').click()");
         using (var shot = File.Create(Path.ChangeExtension(verification[1], ".analysis.png")))
             await browser.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png, shot);
 

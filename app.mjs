@@ -171,6 +171,11 @@ const groups = {
   review: 'attention', fix: 'attention', hold: 'attention', ready: 'ready',
   duplicate: 'history', replaced: 'history', info: 'history',
 };
+const views = {
+  overview: ['Обзор сверки', 'По каким письмам нужно принять решение.'],
+  queue: ['Очередь счетов', 'Найдите письмо и проверьте, как получен результат.'],
+  rules: ['Правила сверки', 'Справочник из загруженной книги Excel.'],
+};
 
 let workbook;
 let hasWorkbook = false;
@@ -266,14 +271,60 @@ function countResults() {
   return counts;
 }
 
+function setView(view, focusHeading = false) {
+  for (const key of Object.keys(views)) {
+    $('view-' + key).hidden = key !== view;
+  }
+  for (const button of $('workspace-nav').querySelectorAll('[data-view]')) {
+    if (button.dataset.view === view) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+  }
+  const [title, description] = views[view];
+  $('analysis-heading').textContent = title;
+  $('view-description').textContent = description;
+  if (focusHeading) $('analysis-heading').focus();
+}
+
+function renderOverview() {
+  const counts = countResults();
+  const actionable = counts.attention > 0;
+  $('overview-title').textContent = actionable ? 'Требуют внимания' : 'Очередь проверена';
+  $('overview-message').textContent = actionable
+    ? 'Откройте спорные письма, чтобы увидеть причину и следующий шаг.'
+    : 'По загруженной книге нет писем, требующих действия.';
+  $('overview-number').textContent = format.format(counts.attention);
+  $('overview-total').textContent = `из ${format.format(counts.all)} писем`;
+  $('open-priority').textContent = actionable ? 'Открыть спорные письма' : 'Открыть очередь';
+  $('open-priority').dataset.filter = actionable ? 'attention' : 'all';
+  $('overview-track').innerHTML = ['attention', 'ready', 'history']
+    .filter(key => counts[key] > 0)
+    .map(key => `<span class="track-${key}" style="flex-grow:${counts[key]}"></span>`).join('');
+  $('kpis').innerHTML = Object.entries(filters).map(([key, [, label, tone]]) =>
+    `<button type="button" class="kpi" data-filter="${key}"><span class="kpi-top"><i class="dot ${tone}" aria-hidden="true"></i>${label}</span><span class="kpi-value">${format.format(counts[key])}</span></button>`).join('');
+
+  const featured = ['hold', 'fix', 'review'].map(status =>
+    dataset.entries.find(entry => entry.status === status)).filter(Boolean);
+  $('priority-list').hidden = featured.length === 0;
+  $('priority-entries').innerHTML = featured.map(entry => `
+    <button class="priority-row" type="button" data-entry="${escape(entry.id)}">
+      <span><strong>${escape(entry.id)} · ${escape(entry.title)}</strong><small>${escape(supplier(entry))}</small></span>
+      ${badge(entry)}
+      <span class="priority-arrow" aria-hidden="true">→</span>
+    </button>`).join('');
+}
+
+function renderRules() {
+  const rules = Object.entries(dataset.rules).sort(([a], [b]) => a.localeCompare(b, 'ru', {numeric: true}));
+  $('rule-list').innerHTML = rules.length ? rules.map(([id, rule]) =>
+    `<details class="rule"><summary><b>${escape(id)}</b> ${escape(rule.title)}</summary><p>${escape(rule.text)}</p></details>`).join('')
+    : '<p class="empty">В загруженной книге нет правил для отображения.</p>';
+}
+
 function render({preserveFocus = false} = {}) {
   const rows = visibleEntries();
   visibleById = new Map(rows.map(entry => [entry.id, entry]));
   if (!visibleById.has(selected)) selected = rows[0]?.id ?? '';
-  const counts = countResults();
-  $('queue-count').textContent = `${rows.length} из ${counts.all} писем`;
-  $('kpis').innerHTML = Object.entries(filters).map(([key, [, label, tone]]) =>
-    `<button type="button" class="kpi" data-filter="${key}"><span class="kpi-top"><i class="dot ${tone}" aria-hidden="true"></i>${label}</span><span class="kpi-value">${counts[key]}</span></button>`).join('');
+  $('queue-count').textContent = `${format.format(rows.length)} из ${format.format(dataset.entries.length)} писем`;
   $('filters').innerHTML = Object.entries(filters).map(([key, [label]]) =>
     `<button type="button" class="filter" data-filter="${key}" aria-pressed="${filter === key}">${label}</button>`).join('');
   $('rows').innerHTML = rows.map(entry => `
@@ -294,28 +345,48 @@ function setAnalysis(result, label, data) {
   hasWorkbook = true;
   dataset = result;
   $('source').textContent = label;
+  $('source').title = label;
   added = [];
   filter = 'all';
   selected = '';
   $('search').value = '';
   render();
+  renderOverview();
+  renderRules();
   $('import-start').hidden = true;
   $('analysis').hidden = false;
-  $('analysis-heading').focus();
+  setView('overview', true);
 }
 
-function setFilter(key, target) {
+function openQueue(key, entryId = '') {
+  filter = key;
+  selected = entryId;
+  $('search').value = '';
+  setView('queue', !entryId);
+  render({preserveFocus: Boolean(entryId)});
+  if (entryId) selectedRow?.scrollIntoView({block: 'nearest'});
+}
+
+$('workspace-nav').addEventListener('click', event => {
+  const view = event.target.closest('[data-view]')?.dataset.view;
+  if (view) setView(view);
+});
+$('open-priority').addEventListener('click', event => openQueue(event.currentTarget.dataset.filter));
+$('kpis').addEventListener('click', event => {
+  const key = event.target.closest('[data-filter]')?.dataset.filter;
+  if (key) openQueue(key);
+});
+$('priority-entries').addEventListener('click', event => {
+  const id = event.target.closest('[data-entry]')?.dataset.entry;
+  if (id) openQueue('attention', id);
+});
+$('filters').addEventListener('click', event => {
+  const key = event.target.closest('[data-filter]')?.dataset.filter;
+  if (!key) return;
   filter = key;
   render();
-  document.querySelector(`#${target} [data-filter="${key}"]`)?.focus({preventScroll: true});
-}
-
-for (const id of ['kpis', 'filters']) {
-  $(id).addEventListener('click', event => {
-    const key = event.target.closest('[data-filter]')?.dataset.filter;
-    if (key) setFilter(key, id);
-  });
-}
+  $('filters').querySelector(`[data-filter="${key}"]`)?.focus({preventScroll: true});
+});
 $('search').addEventListener('input', () => render());
 $('rows').addEventListener('click', event => {
   const row = event.target.closest('tr[data-id]');
@@ -436,8 +507,10 @@ $('letter-form').addEventListener('submit', async event => {
     $('search').value = '';
     $('letter-dialog').close();
     form.reset();
-    render();
-    document.querySelector('.selected')?.scrollIntoView({block: 'nearest'});
+    renderOverview();
+    setView('queue');
+    render({preserveFocus: true});
+    selectedRow?.scrollIntoView({block: 'nearest'});
   } catch (problem) {
     $('letter-dialog').close();
     error(`Не удалось проверить письмо. ${problem.message}`);
