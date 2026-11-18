@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0a0c0f">
+  <meta name="theme-color" content="#0c1117">
   <title>Поток — сверка счетов</title>
   <link rel="icon" type="image/svg+xml" href="./assets/potok.svg">
   <script>
     try {
       if (localStorage.getItem('pilot-theme') === 'light') {
         document.documentElement.dataset.theme = 'light';
-        document.querySelector('meta[name="theme-color"]').content = '#f2f5f6';
+        document.querySelector('meta[name="theme-color"]').content = '#f3f6f8';
       }
     } catch {
       // The app can run when the browser blocks storage.
@@ -34,7 +34,7 @@
     <div class="top-inner">
       <div class="brand"><img class="brand-mark" src="./assets/potok.svg" alt="" width="33" height="33">Поток</div>
       <span class="top-divider"></span>
-      <span class="top-context">Бухгалтерия</span>
+      <span class="top-context">Проверка счетов</span>
       <span class="top-case">Navicon AI Fest · Кейс 04</span>
       <button class="theme-toggle" id="theme-toggle" type="button" role="switch" aria-label="Светлая тема" aria-checked="false" title="Переключить тему">
         <span class="theme-icon theme-moon" aria-hidden="true">☾</span>
@@ -47,19 +47,31 @@
     <p class="error-banner" id="error" role="alert" hidden></p>
     <p class="file-status" id="file-status" role="status"></p>
     <section class="import-card" id="import-start" aria-labelledby="import-heading">
-      <div class="import-icon" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
-      <h1 id="import-heading">Загрузите Excel для сверки</h1>
-      <p>Выберите книгу данных кейса №04. Приложение сопоставит счета с заказами, приёмкой и согласованиями и покажет, какие письма требуют внимания.</p>
-      <button class="button primary" id="choose-file" type="button"><span aria-hidden="true">↑</span> Выбрать файл XLSX</button>
-      <p class="import-format">Листы книги: «Счета и письма», «Заказы и приёмка», «Согласования» и «Правила».</p>
+      <div class="import-intro">
+        <div class="import-icon" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+        <h1 id="import-heading">Загрузите Excel<br><span>для сверки счетов</span></h1>
+        <p>Загрузите Excel, чтобы сопоставить счета с заказами и приёмкой. «Поток» найдёт расхождения и покажет следующий шаг.</p>
+        <button class="button primary" id="choose-file" type="button"><span aria-hidden="true">↑</span> Выбрать файл XLSX</button>
+        <p class="import-privacy"><span class="source-dot" aria-hidden="true"></span> Данные обрабатываются на вашем компьютере</p>
+      </div>
+      <div class="import-guide">
+        <h2>Одна книга для всей сверки</h2>
+        <p>Выберите файл кейса №04 с четырьмя листами.</p>
+        <ol class="import-sheets">
+          <li><span data-icon="mail" aria-hidden="true"></span><div><strong>Счета и письма</strong><span>Что прислал поставщик</span></div></li>
+          <li><span data-icon="queue" aria-hidden="true"></span><div><strong>Заказы и приёмка</strong><span>Что заказали и получили</span></div></li>
+          <li><span data-icon="check" aria-hidden="true"></span><div><strong>Согласования</strong><span>Какие условия изменились</span></div></li>
+          <li><span data-icon="rules" aria-hidden="true"></span><div><strong>Правила</strong><span>На что опирается проверка</span></div></li>
+        </ol>
+      </div>
     </section>
     <section class="workspace" id="analysis" aria-labelledby="analysis-heading" hidden>
       <aside class="workspace-sidebar">
         <span class="workspace-label">Сверка счетов</span>
         <nav id="workspace-nav" aria-label="Разделы Потока">
-          <button class="workspace-tab" type="button" data-view="overview" aria-controls="view-overview" aria-current="page">Обзор</button>
-          <button class="workspace-tab" type="button" data-view="queue" aria-controls="view-queue">Очередь счетов</button>
-          <button class="workspace-tab" type="button" data-view="rules" aria-controls="view-rules">Правила сверки</button>
+          <button class="workspace-tab" type="button" data-view="overview" aria-controls="view-overview" aria-current="page"><span data-icon="overview" aria-hidden="true"></span>Обзор</button>
+          <button class="workspace-tab" type="button" data-view="queue" aria-controls="view-queue"><span data-icon="queue" aria-hidden="true"></span>Очередь счетов</button>
+          <button class="workspace-tab" type="button" data-view="rules" aria-controls="view-rules"><span data-icon="rules" aria-hidden="true"></span>Правила сверки</button>
         </nav>
         <div class="workspace-source"><span class="source-dot" aria-hidden="true"></span><div><span>Загруженный файл</span><strong id="source"></strong></div></div>
       </aside>
@@ -78,16 +90,16 @@
         <section id="view-overview" aria-labelledby="overview-title">
           <div class="overview-feature">
             <div>
+              <span class="feature-label">Результат проверки</span>
               <h2 id="overview-title">Результат сверки</h2>
               <p id="overview-message"></p>
               <button type="button" class="button primary" id="open-priority">Открыть очередь</button>
             </div>
-            <div class="overview-count"><strong id="overview-number"></strong><span id="overview-total"></span></div>
-            <div class="overview-track" id="overview-track" aria-hidden="true"></div>
+            <div class="overview-ring" id="overview-ring"><div class="overview-count"><strong id="overview-number"></strong><span id="overview-total"></span></div></div>
           </div>
           <div class="kpis" id="kpis" aria-label="Сводка очереди"></div>
           <section class="panel priority" id="priority-list" aria-labelledby="priority-title">
-            <div class="panel-head"><div><h2 id="priority-title">С чего начать</h2><p>Реквизиты, явные ошибки и счета, которые нужно уточнить.</p></div></div>
+            <div class="panel-head"><div><h2 id="priority-title">С чего начать</h2><p>Откройте письмо, чтобы проверить причину и выбрать следующий шаг.</p></div><span class="panel-label">Требуют действия</span></div>
             <div id="priority-entries"></div>
           </section>
         </section>
@@ -115,7 +127,7 @@
         </section>
       </div>
     </section>
-    <footer><span>Пилот сверки счетов поставщиков</span><a href="https://navicons.com/careers/ai-fest-2026/cases/#case-04">Условия кейса ↗</a></footer>
+    <footer><span>Поток · Сверка счетов поставщиков</span><a href="https://navicons.com/careers/ai-fest-2026/cases/#case-04">Условия кейса ↗</a></footer>
   </main>
   <dialog id="letter-dialog" aria-labelledby="letter-title">
     <form id="letter-form">

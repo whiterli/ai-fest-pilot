@@ -12,8 +12,8 @@ using Microsoft.Web.WebView2.WinForms;
 
 [assembly: AssemblyTitle("Поток — сверка счетов")]
 [assembly: AssemblyProduct("Поток")]
-[assembly: AssemblyVersion("1.6.0.0")]
-[assembly: AssemblyFileVersion("1.6.0.0")]
+[assembly: AssemblyVersion("1.7.0.0")]
+[assembly: AssemblyFileVersion("1.7.0.0")]
 
 static class Program
 {
@@ -190,7 +190,7 @@ sealed class PilotWindow : Form
             Math.Min(ScaleToDpi(1220, dpi), work.Width - ScaleToDpi(48, dpi)),
             Math.Min(ScaleToDpi(820, dpi), work.Height - ScaleToDpi(72, dpi)));
         MinimumSize = new Size(ScaleToDpi(390, dpi), ScaleToDpi(420, dpi));
-        view = new WebView2 { Dock = DockStyle.Fill, DefaultBackgroundColor = Color.FromArgb(10, 12, 15) };
+        view = new WebView2 { Dock = DockStyle.Fill, DefaultBackgroundColor = Color.FromArgb(12, 17, 23) };
         Controls.Add(view);
         Shown += Initialize;
     }
@@ -269,7 +269,7 @@ sealed class PilotWindow : Form
     {
         int value = dark ? 1 : 0;
         DwmSetWindowAttribute(Handle, UseImmersiveDarkMode, ref value, sizeof(int));
-        view.DefaultBackgroundColor = dark ? Color.FromArgb(10, 12, 15) : Color.FromArgb(242, 245, 246);
+        view.DefaultBackgroundColor = dark ? Color.FromArgb(12, 17, 23) : Color.FromArgb(243, 246, 248);
     }
 
 #if VERIFY
@@ -299,13 +299,13 @@ sealed class PilotWindow : Form
             await browser.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png, shot);
         await Expect(browser, "!document.getElementById('startup').open");
         await Expect(browser, "!document.getElementById('import-start').hidden && document.getElementById('analysis').hidden && document.querySelectorAll('#rows tr').length === 0");
-        await Expect(browser, "document.documentElement.dataset.theme === 'dark' && getComputedStyle(document.documentElement).backgroundColor === 'rgb(10, 12, 15)'");
+        await Expect(browser, "document.documentElement.dataset.theme === 'dark' && getComputedStyle(document.documentElement).backgroundColor === 'rgb(12, 17, 23)'");
         await Expect(browser, "getComputedStyle(document.querySelector('.theme-moon')).backgroundColor === 'rgb(13, 186, 204)'");
         using (var shot = File.Create(Path.ChangeExtension(verification[1], ".png")))
             await browser.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png, shot);
         await browser.ExecuteScriptAsync("document.getElementById('theme-toggle').click()");
         await Expect(browser, "document.documentElement.matches(':active-view-transition')");
-        await Expect(browser, "document.getElementById('theme-toggle').getAttribute('aria-checked') === 'true' && getComputedStyle(document.documentElement).backgroundColor === 'rgb(242, 245, 246)'");
+        await Expect(browser, "document.getElementById('theme-toggle').getAttribute('aria-checked') === 'true' && getComputedStyle(document.documentElement).backgroundColor === 'rgb(243, 246, 248)'");
         await Expect(browser, "!document.documentElement.matches(':active-view-transition')");
         await Expect(browser, "getComputedStyle(document.querySelector('.theme-sun')).backgroundColor === 'rgb(13, 186, 204)'");
         using (var shot = File.Create(Path.ChangeExtension(verification[1], ".light.png")))

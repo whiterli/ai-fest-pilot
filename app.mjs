@@ -158,6 +158,17 @@ const quantity = (value, unit) => value == null ? '—' : `${format.format(value
 const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
 })[char]);
+const iconPaths = {
+  overview: '<rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/>',
+  queue: '<path d="M8 3h8l4 4v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h3Z"/><path d="M8 11h8M8 15h8M8 7h4"/>',
+  rules: '<path d="M12 5c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-3-1-6-1-9 1Zm0 0v15"/>',
+  check: '<path d="m5 12 4 4L19 6"/>',
+  mail: '<rect x="3" y="5" width="18" height="14" rx="3"/><path d="m4 7 8 6 8-6"/>',
+  alert: '<path d="M12 8v5m0 3h.01"/><path d="m10.3 4-8 14A1.4 1.4 0 0 0 3.6 20h16.8a1.4 1.4 0 0 0 1.3-2L13.7 4a2 2 0 0 0-3.4 0Z"/>',
+  history: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5m4 0v5l3 2"/>',
+};
+const icon = name => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${iconPaths[name]}</svg>`;
+for (const target of document.querySelectorAll('[data-icon]')) target.innerHTML = icon(target.dataset.icon);
 const heading = entry => entry.looksLikeBill && entry.invoice ? `Счёт №${entry.invoice}` : `Письмо ${entry.id}`;
 const supplier = entry => String(entry.sender ?? 'Поставщик не указан').split(',')[0].replace(/[«»]/g, '');
 const badge = entry => `<span class="badge ${statuses[entry.status][1]}">${statuses[entry.status][0]}</span>`;
@@ -255,10 +266,11 @@ function renderDetail(entry, animate = false) {
     <div class="detail-head">
       <div class="detail-top"><span class="eyebrow">${escape(entry.id)}${entry.received ? ` · ${escape(entry.received)}` : ''}</span>${badge(entry)}</div>
       <h2>${escape(heading(entry))}</h2><p>${escape(supplier(entry))}</p>
+      ${entry.amount != null ? `<div class="detail-amount"><span>Сумма счёта</span><strong>${escape(amount(entry.amount))}</strong></div>` : ''}
     </div>
     <div class="detail-body${animate ? ' detail-enter' : ''}">
-      <div class="finding ${tone}"><h3>${escape(entry.title)}</h3><p>${escape(entry.explanation)}</p></div>
-      <div class="next"><span class="arrow" aria-hidden="true">→</span><div><h3>Следующий шаг</h3><p>${escape(entry.action)}</p></div></div>
+      <div class="finding ${tone}"><span class="finding-icon">${icon(entry.status === 'ready' ? 'check' : 'alert')}</span><div><h3>${escape(entry.title)}</h3><p>${escape(entry.explanation)}</p></div></div>
+      <div class="next"><span class="arrow" aria-hidden="true">↳</span><div><h3>Следующий шаг</h3><p>${escape(entry.action)}</p></div></div>
       ${facts(entry)}
       ${entry.related ? `<p><button class="link" type="button" data-related="${escape(entry.related)}">Связанное письмо · ${escape(entry.related)} ↗</button></p>` : ''}
       ${draft(entry)}${evidence(entry)}
@@ -296,18 +308,21 @@ function renderOverview() {
   $('overview-total').textContent = `из ${format.format(counts.all)} писем`;
   $('open-priority').textContent = actionable ? 'Открыть спорные письма' : 'Открыть очередь';
   $('open-priority').dataset.filter = actionable ? 'attention' : 'all';
-  $('overview-track').innerHTML = ['attention', 'ready', 'history']
-    .filter(key => counts[key] > 0)
-    .map(key => `<span class="track-${key}" style="flex-grow:${counts[key]}"></span>`).join('');
+  const attentionEnd = counts.all ? counts.attention / counts.all * 100 : 0;
+  const readyEnd = counts.all ? (counts.attention + counts.ready) / counts.all * 100 : 0;
+  $('overview-ring').style.background = `conic-gradient(var(--accent) 0 ${attentionEnd}%, var(--green) ${attentionEnd}% ${readyEnd}%, var(--control-line) ${readyEnd}% 100%)`;
+  const metricIcons = {all: 'mail', attention: 'alert', ready: 'check', history: 'history'};
+  const metricNotes = {all: 'В загруженной книге', attention: 'Нужна проверка бухгалтера', ready: 'Данные совпали', history: 'Информация и дубли'};
   $('kpis').innerHTML = Object.entries(filters).map(([key, [, label, tone]]) =>
-    `<button type="button" class="kpi" data-filter="${key}"><span class="kpi-top"><i class="dot ${tone}" aria-hidden="true"></i>${label}</span><span class="kpi-value">${format.format(counts[key])}</span></button>`).join('');
+    `<button type="button" class="kpi ${tone}" data-filter="${key}"><span class="kpi-top"><span>${label}</span><span class="kpi-icon">${icon(metricIcons[key])}</span></span><span class="kpi-value">${format.format(counts[key])}</span><span class="kpi-note">${metricNotes[key]}</span></button>`).join('');
 
   const featured = ['hold', 'fix', 'review'].map(status =>
     dataset.entries.find(entry => entry.status === status)).filter(Boolean);
   $('priority-list').hidden = featured.length === 0;
   $('priority-entries').innerHTML = featured.map(entry => `
     <button class="priority-row" type="button" data-entry="${escape(entry.id)}">
-      <span><strong>${escape(entry.id)} · ${escape(entry.title)}</strong><small>${escape(supplier(entry))}</small></span>
+      <span class="priority-icon ${statuses[entry.status][1]}">${icon(entry.status === 'hold' ? 'queue' : 'alert')}</span>
+      <span class="priority-copy"><strong>${escape(entry.title)}</strong><small>${escape(entry.id)} · ${escape(supplier(entry))}</small></span>
       ${badge(entry)}
       <span class="priority-arrow" aria-hidden="true">→</span>
     </button>`).join('');
